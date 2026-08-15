@@ -1,0 +1,27 @@
+{
+  "name": "autoquestbot-v2",
+  "version": "2.0.0",
+  "description": "Discord Quest Auto Completion Bot with Slash Commands",
+  "main": "bot.ts",
+  "scripts": {
+    "start": "tsx bot.ts",
+    "dev": "tsx --env-file=.env bot.ts",
+    "register": "tsx src/registerCommands.ts"
+  },
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "discord-api-types": "^0.38.42",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@discordjs/core": "2.4.0",
+    "@discordjs/rest": "2.6.0",
+    "@discordjs/ws": "2.0.4",
+    "undici": "^6.24.1"
+  }
+}

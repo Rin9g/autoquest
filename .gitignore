@@ -1,0 +1,11 @@
+# Environment variables (Contains secret tokens - DO NOT UPLOAD TO GITHUB)
+.env
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+
+# Node modules & temporary files
+node_modules/
+dist/
+*.log
