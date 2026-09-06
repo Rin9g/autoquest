@@ -25,6 +25,7 @@ if not BOT_TOKEN:
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+
 # Replace with your actual Webhook URL
 WEBHOOK_URL = os.getenv("WEBHOOK_ID")
 
@@ -158,34 +159,92 @@ async def complete_quests(interaction: discord.Interaction, token: str):
 
 async def _fetch_medal_clip_url(url: str) -> str | None:
     """
-    Fetches a Medal.tv clip page and extracts the direct video contentUrl.
-    Returns the direct video URL or None if not found.
-    """
-    url = url.strip().replace("?theater=true", "")
+    Extracts the direct video URL from a Medal.tv clip.
 
-    if "medal" not in url:
+    Strategy (in order):
+    1. Extract the clip urlKey from the URL
+    2. Try Medal.tv public API  → returns contentUrl directly
+    3. Try __NEXT_DATA__ JSON embedded in the page HTML (Next.js)
+    4. Fall back to legacy contentUrl string search
+    """
+    url = url.strip().replace("?theater=true", "").rstrip("/")
+
+    # Accept bare clip ID like "abc123" → full URL
+    if "medal.tv" not in url:
         if "/" not in url:
             url = f"https://medal.tv/clips/{url}"
         else:
             return None
+
+    # Extract the urlKey — last path segment
+    url_key = url.rstrip("/").split("/")[-1]
 
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/138.0.0.0 Safari/537.36"
-        )
+        ),
+        "Accept": "application/json, text/html, */*",
     }
 
     async with aiohttp.ClientSession(headers=headers) as session:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
-            if resp.status != 200:
-                return None
-            html = await resp.text()
 
-    if '"contentUrl":"' in html:
-        return html.split('"contentUrl":"')[1].split('",')[0]
+        # ── Strategy 1: Medal.tv public API ──────────────────────────────
+        try:
+            api_url = f"https://medal.tv/api/clips?urlKey={url_key}&userId=0&pageSize=1&offset=0"
+            async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                if resp.status == 200:
+                    data = await resp.json(content_type=None)
+                    clips = data if isinstance(data, list) else data.get("clips", [])
+                    if clips:
+                        clip = clips[0]
+                        video_url = (
+                            clip.get("contentUrl")
+                            or clip.get("videoUrl")
+                            or clip.get("directClipUrl")
+                        )
+                        if video_url:
+                            return video_url
+        except Exception as e:
+            print(f"[Medal API] Failed: {e}")
+
+        # ── Strategy 2: __NEXT_DATA__ JSON in page HTML ───────────────────
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                if resp.status == 200:
+                    html = await resp.text()
+
+                    # Next.js embeds all page data in <script id="__NEXT_DATA__">
+                    if '__NEXT_DATA__' in html:
+                        import re, json as _json
+                        match = re.search(
+                            r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>',
+                            html, re.DOTALL
+                        )
+                        if match:
+                            next_data = _json.loads(match.group(1))
+                            # Walk the props tree to find contentUrl
+                            props = next_data.get("props", {})
+                            page_props = props.get("pageProps", {})
+                            clip = page_props.get("clip") or page_props.get("clipData", {})
+                            video_url = (
+                                clip.get("contentUrl")
+                                or clip.get("videoUrl")
+                                or clip.get("directClipUrl")
+                            )
+                            if video_url:
+                                return video_url
+
+                    # ── Strategy 3: Legacy contentUrl string search ───────
+                    if '"contentUrl":"' in html:
+                        return html.split('"contentUrl":"')[1].split('",')[0]
+
+        except Exception as e:
+            print(f"[Medal HTML] Failed: {e}")
+
     return None
+
 
 
 @bot.tree.command(
